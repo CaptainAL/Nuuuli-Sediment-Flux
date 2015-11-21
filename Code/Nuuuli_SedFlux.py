@@ -624,9 +624,12 @@ def PT_Levelogger(allbaro,PTname,XL,sheet,tshift=0,zshift=0): # tshift in hours,
 ## LOAD PT data
 # PT1 = Downstream
 PT1 = PT_Levelogger(allbaro,'PT-Nuuuli1',XL,'PT-Nuuuli1',0)
+PT1['stage(cm)'][PT1['stage(cm)']<=0] = np.nan
 
 # PT2 = Downstream
 PT2 = PT_Levelogger(allbaro,'PT-Nuuuli2',XL,'PT-Nuuuli2',0)
+PT2['stage(cm)'][PT2['stage(cm)']<=0] = np.nan
+
 
 ## Reindex
 PT1 = PT1.reindex(pd.date_range(start2013,stop2014,freq='15Min'))
@@ -637,42 +640,47 @@ def plot_uncorrected_stage_data(show=False):
     for ax in [baro,pt1,pt2]:
         ax.xaxis.set_visible(False)
     allbaro['Baropress'].plot(ax=baro,c='k',label='Barometric Pressure (kPa)')
-    allbaro['Baropress'].plot(ax=t,c='k',label='Barometric Pressure (kPa)')
+    #allbaro['Baropress'].plot(ax=t,c='k',label='Barometric Pressure (kPa)')
+    baro.set_ylabel('kPa')
     baro.legend()
     ## PT1 Downstream
     PT1list = [PT1]
     count = 0
     count_dict = {1:'aa',2:'ab',3:'ba',4:'bb',5:'bc',6:'c'}
+    count_dict = {1:' '}
     for PT in PT1list:
         count+=1
         try:
-            PT['Pressure'].plot(ax=pt1,c=np.random.rand(3,1),label='PT1'+count_dict[count])
-            PT['stage(cm)'].plot(ax=t,c=np.random.rand(3,1),label='PT1'+count_dict[count])
+            PT['Pressure'].plot(ax=pt1,label='PT1'+count_dict[count],c='r')
+            PT['stage(cm)'].plot(ax=t,label='PT1'+count_dict[count],c='r')
         except KeyError:
-            PT['LEVEL'].plot(ax=pt1,c=np.random.rand(3,1),label='PT1'+count_dict[count])
-            PT['stage(cm)'].plot(ax=t,c=np.random.rand(3,1),label='PT1'+count_dict[count])
+            PT['LEVEL'].plot(ax=pt1,label='PT1'+count_dict[count],c='r')
+            PT['stage(cm)'].plot(ax=t,label='PT1'+count_dict[count],c='r')
     pt1.legend()
-    
+    pt1.set_ylabel('kPa')
     ## PT2 Upstream
     PT2list = [PT2]
     count = 0
     count_dict = {1:'aa',2:'ab',3:'b',4:'c',5:'d',6:'e',7:'f',8:'g'}
+    count_dict = {1:' '}
     for PT in PT2list:
         count+=1
         try:
-            PT['Pressure'].plot(ax=pt2,c=np.random.rand(3,1),label='PT2'+count_dict[count])
-            PT['stage(cm)'].plot(ax=t,c=np.random.rand(3,1),label='PT2'+count_dict[count])
+            PT['Pressure'].plot(ax=pt2,label='PT2'+count_dict[count],c='g')
+            PT['stage(cm)'].plot(ax=t,label='PT2'+count_dict[count],c='g')
         except KeyError:
-            PT['LEVEL'].plot(ax=pt2,c=np.random.rand(3,1),label='PT2'+count_dict[count])
-            PT['stage(cm)'].plot(ax=t,c=np.random.rand(3,1),label='PT2'+count_dict[count])
+            PT['LEVEL'].plot(ax=pt2,label='PT2'+count_dict[count],c='g')
+            PT['stage(cm)'].plot(ax=t,label='PT2'+count_dict[count],c='g')
     pt2.legend()
-    t.legend(ncol=2)
+    pt2.set_ylabel('kPa')
+    t.legend(ncol=3)
+    t.set_ylabel('cm')
     
     if show==True:
-        plt.tight_layout(pad=0.1)
+        plt.tight_layout(pad=0.01)
         plt.show()
     return
-#plot_uncorrected_stage_data(show=True)
+plot_uncorrected_stage_data(show=True)
 
 ## STAGE DATA FOR PT's
 #### FINAL STAGE DATA with CORRECTIONS
@@ -781,17 +789,66 @@ def Stage_Q_AV_RatingCurve(path,location,stage_data,slope=.01,Mannings_n=.033,tr
                         print location+' '+str(DateTime)+' '+'Stage= '+str(stage)+' Q= '+str(AV_Q)
                     Qdf = Qdf.append(pd.DataFrame({'stage(cm)':stage,'Q-AV(L/sec)':round(AV_Q,0),'Q-AManningV(L/sec)':round(ManningQ,0),
                     'Area(m2)':Area,'V(m/s)':V,'ManningV(m/s)':ManningV,'WP':WP,'R':R},index=[DateTime]))
-                    
+                    print str(DateTime)+': stage='+'%.2f'%stage+' Q= '+'%.0f'%AV_Q+' ManningQ= '+'%.2f'%ManningQ+' Area(m2)='+'%.2f'%Area+' WP='+'%.2f'%WP+' R='+'%.2f'%R
                     if printResults==True:                    
-                        print str(DateTime)+': stage='+'%.2f'%stage+' Q= '+'%.0f'%AV_Q+' ManningQ= '+'%.2f'%ManningQ
                         print df              
     return Qdf  
 
+def Mannings_Q_from_stage_data(Cross_section_file,sheetname,stage_data,Slope,Manning_n,k=1):    
+    ## Open and parse file; drop NA  
+    print Cross_section_file+' '+sheetname
+    print 'Slope: '+str(Slope)+' Mannings n: '+str(Manning_n)
+    XL = pd.ExcelFile(Cross_section_file) 
+    df = XL.parse(sheetname,header=4,parse_cols='F:H')
+    df = df.dropna()
+    ## Mannings Parameters S:slope, n:Mannings n
+    S = Slope # m/m
+    n= Manning_n
+    ## empty lists
+    areas, wp, r, Man_n, v, q, = [],[],[],[],[],[]
+    ## Stage data
+    stage_data = stage_data/100 ## cm to m
+    for stage in stage_data.values:
+        print 'stage: '+str(stage)
+        df['y1'] = df['depth']+df['Rod Reading'].max()
+        df['y2'] = stage
+        df['z'] = df['y2']-df['y1']
+        df['z'] = df['z'][df['z']>=0]
+        x = df['Dist'].values
+        y1 = df['y1'].values
+        y2 = df['y2'].values
+        z = y2-y1
+        z= np.where(z>=0,z,0)
+        Area = np.trapz(z,x)
+        ## Wetted Perimeter0.01
+        df['dx'] =df['Dist'].sub(df['Dist'].shift(1),fill_value=0)
+        df['dy'] = df['z'].sub(df['z'].shift(1),fill_value=0)
+        df['wp'] = (df['dx']**2 + df['dy']**2)**0.5
+        WP = df['wp'].sum()
+        R = (Area/WP) ## m2/m = m
+        ## Jarrett (1990) equation for n
+        ## n = 0.32*(S**0.30)*(R**-0.16)
+        if Manning_n == 'Jarrett':
+            n = 0.32*(S**0.30)*(R**-0.16) 
+            n = n * k
+        ## Mannings = (1R^2/3 * S^1/2)/n
+        ManningV = (1*(R**(2.0/3.0))*(S**0.5))/n ## m/s
+        ManningQ = ManningV * Area ## M3/s
+        ManningQ= round(ManningQ,3)
+        areas.append(Area)
+        wp.append(WP)
+        r.append(R)
+        Man_n.append(n)
+        v.append(ManningV)
+        q.append(ManningQ)        
+    DF = pd.DataFrame({'stage(m)':stage_data.values,'area(m2)':areas,'wp(m)':wp,'r':r,'Man_n':Man_n,'vel(m/s)':v,'Q(m3/s)':q},index=stage_data.index)
+    return DF
+
 ## N1 AV measurements
 ## Mannings parameters for A-ManningV
-N1_Slope = 0.0161 # m/m
-N1_n=0.067 # Mountain stream rocky bed and rivers with variable sections and veg along banks (Dunne 1978)
-
+N1_Slope = 0.013 # m/m
+N1_n= 'Jarrett' # Mountain stream rocky bed and rivers with variable sections and veg along banks (Dunne 1978)
+N1_k = 1
 #DataFrame with Q from AV measurements, Q from measured A with Manning-predicted V, stage, and Q from Manning's and assumed rectangular channel
 N1stageDischarge = Stage_Q_AV_RatingCurve(datadir+'Q/Flow_Files/','N1',Nuuuli_stage_data,slope=N1_Slope,Mannings_n=N1_n,trapezoid=True).dropna() 
 N1stageDischargeLog = N1stageDischarge.apply(np.log10) #log-transformed version
@@ -806,14 +863,55 @@ N1_AManningV = pd.ols(y=N1stageDischarge['Q-AManningV(L/sec)'],x=N1stageDischarg
 ## Power with Mannings and measured Area
 N1_AManningVLog = pd.ols(y=N1stageDischargeLog['Q-AManningV(L/sec)'],x=N1stageDischargeLog['stage(cm)'],intercept=True)
 
+
+## Read N1_Man Discharge from .csv, or calculate new if needed
+if 'N1_Man' not in locals():
+    try:
+        print 'Loading Mannings Q for DAM from CSV'
+        N1_Man_reduced = pd.DataFrame.from_csv(datadir+'Q/Manning_Q_files/N1_Man_reduced.csv')
+        N1_Man = pd.DataFrame.from_csv(datadir+'Q/Manning_Q_files/N1_Man.csv')
+    except:
+        print 'Calculate Mannings Q for N1 and saving to CSV'
+        N1_stage_reduced = Nuuuli_stage_data['N1'].dropna().round(0).drop_duplicates().order()
+        N1_stage_reduced = N1_stage_reduced[N1_stage_reduced>0]
+        N1_Man_reduced = Mannings_Q_from_stage_data(datadir+'Q/Cross_Section_Surveys/N1_cross_section.xlsx','N1-2_m',Slope=N1_Slope,Manning_n=N1_n,k=N1_k,stage_data=N1_stage_reduced)
+        N1_Man_reduced.to_csv(datadir+'Q/Manning_Q_files/N1_Man_reduced.csv')
+        N1_stage= Nuuuli_stage_data['N1']
+        N1_Man= Mannings_Q_from_stage_data(datadir+'Q/Cross_Section_Surveys/N1_cross_section.xlsx','N1-2_m',Slope=N1_Slope,Manning_n=N1_n,k=N1_k,stage_data=N1_stage)
+        N1_Man.to_csv(datadir+'Q/Manning_Q_files/N1_Man.csv')
+        pass
+
+def Manning_AV_r2(ManningsQ_Series,AV_Series):
+    # LBJ Mannings = y predicted
+    ManQ, Manstage = ManningsQ_Series['Q(m3/s)']*1000, ManningsQ_Series['stage(m)']*100
+    y_predicted = pd.DataFrame({'Q_Man':ManQ.values},index=Manstage).sort()
+    ## LBJ AV  = y
+    AV_Q, AVstage = AV_Series['Q-AV(L/sec)'], AV_Series['stage(cm)'].apply(np.int)
+    y_ = pd.DataFrame({'Q_AV':AV_Q.values},index=AVstage).sort()
+    y_['Q_Man'] = y_predicted
+    y_=  y_.dropna() # keep it clean
+    
+    y_bar = y_['Q_AV'].mean()
+    y_var = (y_['Q_AV'] - y_bar)**2.
+    ss_tot = y_var.sum()
+    y_res = (y_['Q_AV']-y_['Q_Man'])**2.
+    ss_res = y_res.sum()
+    r2 = 1-(ss_res/ss_tot)
+    return  r2
+N1_Man_r2 = Manning_AV_r2(N1_Man_reduced,N1stageDischarge)
+
+
+
 ### Compare Discharge Ratings from different methods
 def plotQratingN1(ms=6,show=False,log=False,save=False,filename=figdir+''): ## Rating Curves
     mpl.rc('lines',markersize=ms)
     title="Water Discharge Ratings for N1"
     fig, (site_N1, site_N1_zoom)= plt.subplots(1,2,figsize=(8,4))
     xy = np.linspace(0,8000,8000)
+    
     site_N1.text(0.1,0.95,'(a)',verticalalignment='top', horizontalalignment='right',transform=site_N1.transAxes,color='k',fontsize=10,fontweight='bold')
     site_N1_zoom.text(0.1,0.95,'(b)',verticalalignment='top', horizontalalignment='right',transform=site_N1_zoom.transAxes,color='k',fontsize=10,fontweight='bold')
+    
     #N1 AV Measurements and Rating Curve
     site_N1.plot(N1stageDischarge['Q-AV(L/sec)'][start2013:stop2013],N1stageDischarge['stage(cm)'][start2013:stop2013],'^',color='k',fillstyle='none',label='AV 2013') 
     site_N1.plot(N1stageDischarge['Q-AV(L/sec)'][start2014:stop2014],N1stageDischarge['stage(cm)'][start2014:stop2014],'s',color='k',fillstyle='none',label='AV 2014') 
@@ -829,9 +927,9 @@ def plotQratingN1(ms=6,show=False,log=False,save=False,filename=figdir+''): ## R
     PowerFit(N1stageDischarge['Q-AV(L/sec)'],N1stageDischarge['stage(cm)'],xy,site_N1,c='grey',ls='-',label='AV power law '+r'$r^2$'+"%.2f"%N1_AVpower['r2'])    
     PowerFit(N1stageDischarge['Q-AV(L/sec)'],N1stageDischarge['stage(cm)'],xy,site_N1_zoom,c='grey',ls='-',label='AV power law '+r'$r^2$'+"%.2f"%N1_AVpower['r2'])        
     ## N1 Mannings from stream survey
-    #N1_ManQ, N1_Manstage = N1_Man_reduced['Q(m3/s)']*1000, N1_Man_reduced['stage(m)']*100
-    #site_lbj.plot(LBJ_ManQ,LBJ_Manstage,'-',markersize=2,c='k',label='Mannings: n='+str(LBJ_n)+r'$ r^2$'+"%.2f"%LBJ_Man_r2)
-    #site_N1_zoom.plot(N1_ManQ,N1_Manstage,'-',markersize=2,c='k',label='Mannings')
+    N1_ManQ, N1_Manstage = N1_Man_reduced['Q(m3/s)']*1000, N1_Man_reduced['stage(m)']*100
+    site_N1.plot(N1_ManQ, N1_Manstage,'-',markersize=2,c='k',label='Mannings: n='+str(N1_n)+r'$ r^2$'+"%.2f"%N1_Man_r2)
+    site_N1_zoom.plot(N1_ManQ,N1_Manstage,'-',markersize=2,c='k',label='Mannings')
     ## Label point -click
     labelindex_subplot(site_N1, N1stageDischarge.index,N1stageDischarge['Q-AV(L/sec)'],N1stageDischarge['stage(cm)'])
     labelindex_subplot(site_N1_zoom, N1stageDischarge.index,N1stageDischarge['Q-AV(L/sec)'],N1stageDischarge['stage(cm)'])
@@ -852,14 +950,14 @@ def plotQratingN1(ms=6,show=False,log=False,save=False,filename=figdir+''): ## R
     show_plot(show,fig)
     savefig(save,filename)
     return
-plotQratingN1(ms=6,show=True,log=False,save=False,filename=figdir+'')
+plotQratingN1(ms=6,show=True,log=False,save=True,filename=figdir+'Stage-Q rating N1')
 #plotQratingN1(ms=6,show=True,log=True,save=False,filename=figdir+'')
 
 ## N2 AV measurements
 ## Mannings parameters for A-ManningV
-N2_Slope = 0.0161 # m/m
-N2_n=0.067 # Mountain stream rocky bed and rivers with variable sections and veg along banks (Dunne 1978)
-
+N2_Slope = 0.023 # m/m
+N2_n = 'Jarrett' # Mountain stream rocky bed and rivers with variable sections and veg along banks (Dunne 1978)
+N2_k = 1
 #DataFrame with Q from AV measurements, Q from measured A with Manning-predicted V, stage, and Q from Manning's and assumed rectangular channel
 N2stageDischarge = Stage_Q_AV_RatingCurve(datadir+'Q/Flow_Files/','N2',Nuuuli_stage_data,slope=N2_Slope,Mannings_n=N2_n,trapezoid=True).dropna() 
 N2stageDischargeLog = N2stageDischarge.apply(np.log10) #log-transformed version
@@ -874,6 +972,24 @@ N2_AVLog= pd.ols(y=N2stageDischargeLog['Q-AV(L/sec)'],x=N2stageDischargeLog['sta
 N2_AManningV = pd.ols(y=N2stageDischarge['Q-AManningV(L/sec)'],x=N2stageDischarge['stage(cm)'],intercept=False)
 ## Power with Mannings and measured Area
 N2_AManningVLog = pd.ols(y=N2stageDischargeLog['Q-AManningV(L/sec)'],x=N2stageDischargeLog['stage(cm)'],intercept=False)
+
+
+## Read N2_Man Discharge from .csv, or calculate new if needed
+if 'N2_Man' not in locals():
+    try:
+        print 'Loading Mannings Q for DAM from CSV'
+        N2_Man_reduced = pd.DataFrame.from_csv(datadir+'Q/Manning_Q_files/N2_Man_reduced.csv')
+        N2_Man = pd.DataFrame.from_csv(datadir+'Q/Manning_Q_files/N2_Man.csv')
+    except:
+        print 'Calculate Mannings Q for N2 and saving to CSV'
+        N2_stage_reduced = Nuuuli_stage_data['N2'].dropna().round(0).drop_duplicates().order()
+        N2_Man_reduced = Mannings_Q_from_stage_data(datadir+'Q/Cross_Section_Surveys/N2_cross_section.xlsx','N2-1_m',Slope=N2_Slope,Manning_n=N2_n,k=N2_k,stage_data=N2_stage_reduced)
+        N2_Man_reduced.to_csv(datadir+'Q/Manning_Q_files/N2_Man_reduced.csv')
+        N2_stage= Nuuuli_stage_data['N2']
+        N2_Man= Mannings_Q_from_stage_data(datadir+'Q/Cross_Section_Surveys/N2_cross_section.xlsx','N2-1_m',Slope=N2_Slope,Manning_n=N2_n,k=N2_k,stage_data=N2_stage)
+        N2_Man.to_csv(datadir+'Q/Manning_Q_files/N2_Man.csv')
+        pass
+N2_Man_r2 = Manning_AV_r2(N2_Man_reduced,N2stageDischarge)
 
 ### Compare Discharge Ratings from different methods
 def plotQratingN2(ms=6,show=False,log=False,save=False,filename=figdir+''): ## Rating Curves
@@ -898,8 +1014,8 @@ def plotQratingN2(ms=6,show=False,log=False,save=False,filename=figdir+''): ## R
     PowerFit(N2stageDischarge['Q-AV(L/sec)'],N2stageDischarge['stage(cm)'],xy,site_N2,c='grey',ls='-',label='AV power law '+r'$r^2$'+"%.2f"%N2_AVpower['r2'])    
     PowerFit(N2stageDischarge['Q-AV(L/sec)'],N2stageDischarge['stage(cm)'],xy,site_N2_zoom,c='grey',ls='-',label='AV power law '+r'$r^2$'+"%.2f"%N2_AVpower['r2'])        
     ## N2 Mannings from stream survey
-    #N2_ManQ, N2_Manstage = N2_Man_reduced['Q(m3/s)']*1000, N2_Man_reduced['stage(m)']*100
-    #site_lbj.plot(LBJ_ManQ,LBJ_Manstage,'-',markersize=2,c='k',label='Mannings: n='+str(LBJ_n)+r'$ r^2$'+"%.2f"%LBJ_Man_r2)
+    N2_ManQ, N2_Manstage = N2_Man_reduced['Q(m3/s)']*1000, N2_Man_reduced['stage(m)']*100
+    site_N2.plot(N2_ManQ,N2_Manstage,'-',markersize=2,c='k',label='Mannings: n='+str(N2_n)+r'$ r^2$'+"%.2f"%N2_Man_r2)
     #site_N2_zoom.plot(N2_ManQ,N2_Manstage,'-',markersize=2,c='k',label='Mannings')
     ## Label point -click
     labelindex_subplot(site_N2, N2stageDischarge.index,N2stageDischarge['Q-AV(L/sec)'],N2stageDischarge['stage(cm)'])
@@ -907,8 +1023,8 @@ def plotQratingN2(ms=6,show=False,log=False,save=False,filename=figdir+''): ## R
     ## Label subplots    
     site_N2.set_ylabel('Stage(cm)'),site_N2.set_xlabel('Q(L/sec)'),site_N2_zoom.set_xlabel('Q(L/sec)')
     ## Format subplots
-    site_N2.set_ylim(0,PT1['stage(cm)'].max()+10)#,site_N2.set_xlim(0,N2_AVnonLinear(PT1['stage'].max()+10))
-    site_N2_zoom.set_ylim(0,45), site_N2_zoom.set_xlim(0,1600)
+    site_N2.set_ylim(0,PT2['stage(cm)'].max()+10)#,site_N2.set_xlim(0,N2_AVnonLinear(PT1['stage'].max()+10))
+    site_N2_zoom.set_ylim(20,60), site_N2_zoom.set_xlim(0,1600)
     ## Legends
     site_N2.legend(loc='lower right',fancybox=True)  
     ## Figure title
@@ -921,8 +1037,11 @@ def plotQratingN2(ms=6,show=False,log=False,save=False,filename=figdir+''): ## R
     show_plot(show,fig)
     savefig(save,filename)
     return
-plotQratingN2(ms=6,show=True,log=False,save=False,filename=figdir+'')
+plotQratingN2(ms=6,show=True,log=False,save=True,filename=figdir+'Stage-Q rating N2')
 #plotQratingN2(ms=6,show=True,log=True,save=False,filename=figdir+'')
+
+
+
 
 
 
