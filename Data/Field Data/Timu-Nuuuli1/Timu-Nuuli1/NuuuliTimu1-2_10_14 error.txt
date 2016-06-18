@@ -1,0 +1,2 @@
+Coud not open 'filename'
+Invalid tag 0x88a0 encountered at offset 0x12 while reading the hobo file

@@ -680,7 +680,7 @@ def plot_uncorrected_stage_data(show=False):
         plt.tight_layout(pad=0.01)
         plt.show()
     return
-#plot_uncorrected_stage_data(show=True)
+plot_uncorrected_stage_data(show=True)
 
 ## STAGE DATA FOR PT's
 #### FINAL STAGE DATA with CORRECTIONS

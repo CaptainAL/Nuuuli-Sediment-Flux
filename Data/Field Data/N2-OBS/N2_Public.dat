@@ -1,0 +1,5 @@
+"TOA5","N2","CR2xx","No_SN","CR200X.Std.02","15min_100times_only.CR2","24549","Public"
+"TIMESTAMP","RECORD","BattV","Turb_BS_Median","Turb_BS_Mean","Turb_BS_STD","Turb_BS_Min","Turb_BS_Max","Turb_SS_Median","Turb_SS_Mean","Turb_SS_STD","Turb_SS_Min","Turb_SS_Max"
+"TS","RN","Volts","","","","","","","","","",""
+"","","","","","","","","","","","",""
+"2014-10-01 11:44:14",296,11.16202,5.20142,5.102226,1.69942,0.6547695,11.68578,5.260342,5.250733,0.0392378,5.013138,5.320092
