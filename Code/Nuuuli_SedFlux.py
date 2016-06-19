@@ -37,7 +37,6 @@ ro.r('x=c()')
 ro.r('x[1]="lets talk to R"')
 print(ro.r('x'))
 
-import pypandoc
 
 #### Plotting Tools
 import matplotlib.pyplot as plt
@@ -64,7 +63,7 @@ pd.set_option('display.max_columns', 13)
 #### DIRECTORIES
 git=True
 if git==True: ## Git repository
-    maindir = 'C:/Users/Alex/Documents/GitHub/Nuuuli-Sediment-Flux/' 
+    maindir = 'C:/Users/atm19/Documents/GitHub/Nuuuli-Sediment-Flux/' 
     datadir=maindir+'Data/'
     dataoutputdir = datadir+'Output/'
     GISdir = maindir+'Data/GIS/'
